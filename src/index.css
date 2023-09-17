@@ -11,3 +11,14 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+textarea {
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 0;
+  line-height: 100%;
+  font-size: 12px;
+  font-family: 'Courier New', Courier, monospace;
+  background-color: transparent;
+}
