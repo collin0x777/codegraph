@@ -1,14 +1,11 @@
-
-
 import React from 'react';
 import { Group, Text, Arc, Rect, Circle, RegularPolygon, Line } from 'react-konva';
-import {hash} from "bun";
 
-type TypeDialProps = {
+type TypeDotsProps = {
     x: number;
     y: number;
     radius: number;
-    type: string | null;
+    types: string[] | null;
 }
 
 function hashCode(str: String): number {
@@ -55,44 +52,43 @@ function typeToColors(type: string | null): string[] {
     return [color1, color2, color3, color4];
 }
 
-const TypeDial: React.FC<TypeDialProps> = ({ x, y, radius, type }) => {
-    let colors = typeToColors(type);
+const TypeDots: React.FC<TypeDotsProps> = ({ x, y, radius, types }) => {
+    let colors = types === null ? [] : types!.map(type => typeToColors(type)[0]);
+    let numDots = colors.length;
+    let dotRadius = radius / numDots;
+    let dotSpacing = radius;
 
     return (
         <Group
             x={x}
             y={y}
         >
-            <Arc
-                angle={90}
-                rotation={0}
-                innerRadius={0}
-                outerRadius={radius}
-                fill={colors[0]}
-            />
-            <Arc
-                angle={90}
-                rotation={90}
-                innerRadius={0}
-                outerRadius={radius}
-                fill={colors[1]}
-            />
-            <Arc
-                angle={90}
-                rotation={180}
-                innerRadius={0}
-                outerRadius={radius}
-                fill={colors[2]}
-            />
-            <Arc
-                angle={90}
-                rotation={270}
-                innerRadius={0}
-                outerRadius={radius}
-                fill={colors[3]}
-            />
+            {
+                (numDots === 1) ? (
+                    <Circle
+                        x={0}
+                        y={0}
+                        radius={dotRadius}
+                        fill={colors[0]}
+                    />
+                ) : (
+                    colors.map((color, index) => {
+                        return (
+                            <Circle
+                                key={index}
+                                x={0}
+                                y={0}
+                                radius={dotRadius}
+                                fill={color}
+                                rotation={(index * (180 / (numDots - 1))) - 90}
+                                offsetX={dotSpacing}
+                            />
+                        )
+                    })
+                )
+            }
         </Group>
-    )
+    );
 }
 
-export default TypeDial;
+export default TypeDots;

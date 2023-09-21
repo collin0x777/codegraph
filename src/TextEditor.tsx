@@ -1,159 +1,29 @@
 import React, { useState, useRef } from 'react';
 import { Group, Text, Arc, Rect, Circle, RegularPolygon, Line } from 'react-konva';
 import EditableTextBox from './EditableTextBox';
-import {CustomDropdownButton, CustomMenuButton, CustomOperatorButton, CustomPlayButton} from "./CustomButtons.tsx";
+import {
+    CustomAnimatedTableButton,
+    CustomCodeButton,
+    CustomDropdownButton,
+    CustomMenuButton,
+    CustomOperatorButton,
+    CustomPlayButton, CustomTableButton, CustomXButton
+} from "./CustomButtons.tsx";
+import {DraggableOutlet, WatchfulInlet} from "./InletOutlet.tsx";
 import LogViewer from "./LogViewer.tsx";
 import Konva from "konva";
-import TypeDial from "./TypeDial.tsx";
-import {getFunction, getTypes} from "./Requests.tsx";
+import {FunctionTypes, getFunction, getTypes} from "./Requests.tsx";
+import TestViewer, {Tests} from "./TestViewer.tsx";
+import CodeViewer from "./CodeViewer.tsx";
 
 type TextEditorProps = {
     width: number;
     height: number;
     attemptConnection: (x: number, y: number) => void;
     inletRef: React.MutableRefObject<any>;
+    deleteEditor: () => void;
+    updateTypes: (types: FunctionTypes | null) => void;
 };
-
-type ConnectionProps = {
-    x1: number;
-    y1: number;
-    x2: number;
-    y2: number;
-}
-
-const Connection: React.FC<ConnectionProps> = ({ x1, y1, x2, y2 }) => {
-    const [isHovered, setIsHovered] = useState<boolean>(false);
-
-    const handleMouseEnter = () => {
-        setIsHovered(true);
-    };
-
-    const handleMouseLeave = () => {
-        setIsHovered(false);
-    };
-
-    return (
-        <Group>
-            <Line
-                points={[x1, y1, x2, y2]}
-                stroke="#86BBBD"
-                strokeWidth={2}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
-            />
-            {isHovered ? (
-                <Circle
-                    x={x1}
-                    y={y1}
-                    radius={5}
-                    fill="#86BBBD"
-                />
-            ) : null}
-        </Group>
-    );
-}
-
-type InletOutletProps = {
-    x: number;
-    y: number;
-    size: number;
-}
-
-const InletOutlet: React.FC<InletOutletProps> = ({ x, y, size }) => {
-    return (
-        <Arc
-            x={x}
-            y={y}
-            innerRadius={0} // Set the inner radius to 0 for a full semicircle
-            outerRadius={size} // Adjust the outer radius as needed
-            angle={180} // Set the angle to 180 degrees for a semicircle
-            fill="#86BBBD" // Fill color
-            rotation={-90}
-        />
-    );
-}
-
-type DraggableOutletProps = {
-    x: number;
-    y: number;
-    size: number;
-    attemptConnection: (x: number, y: number) => void;
-    type: string | null;
-}
-
-const DraggableOutlet: React.FC<DraggableOutletProps> = ({ x, y, size, attemptConnection, type }) => {
-
-    const [draggingConnection, setDraggingConnection] = useState(false);
-    const [connectionEndPos, setConnectionEndPos] = useState({ x: 0, y: 0 });
-
-    const handleOutletDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
-        e.cancelBubble = true;
-
-        if (!draggingConnection) {
-            setDraggingConnection(true);
-        }
-    };
-
-    const handleOutletDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
-        e.cancelBubble = true;
-
-        if (draggingConnection) {
-            const outletPos = e.target.position();
-            setConnectionEndPos({ x: outletPos.x, y: outletPos.y });
-        }
-    };
-
-    const handleOutletDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
-        e.cancelBubble = true;
-
-        if (draggingConnection) {
-            attemptConnection(e.target.getAbsolutePosition().x, e.target.getAbsolutePosition().y);
-
-            setConnectionEndPos({ x: 0, y: 0 });
-
-            setDraggingConnection(false);
-        }
-    };
-
-    return (
-        <Group x={x} y={y} >
-            <InletOutlet x={0} y={0} size={size}/>
-            <Line points={[0, 0, connectionEndPos.x, connectionEndPos.y]} stroke="#86BBBD" strokeWidth={2}/>
-            <Group
-                x={connectionEndPos.x}
-                y={connectionEndPos.y}
-                draggable
-                onDragStart={handleOutletDragStart}
-                onDragMove={handleOutletDragMove}
-                onDragEnd={handleOutletDragEnd}
-            >
-                <TypeDial x={0} y={0} radius={size/2} type={type}/>
-            </Group>
-        </Group>
-    )
-}
-
-type WatchfulInletProps = {
-    x: number;
-    y: number;
-    size: number;
-    inletRef:  React.MutableRefObject<Konva.Arc>;
-}
-
-const WatchfulInlet: React.FC<WatchfulInletProps> = ({ x, y, size, inletRef }) => {
-    return (
-        <Arc
-            x={x}
-            y={y}
-            innerRadius={0} // Set the inner radius to 0 for a full semicircle
-            outerRadius={size} // Adjust the outer radius as needed
-            angle={180} // Set the angle to 180 degrees for a semicircle
-            fill="#86BBBD" // Fill color
-            rotation={-90}
-            ref={inletRef}
-        />
-    )
-}
 
 const getCurrentTimeAsString = () => {
     const now = new Date();
@@ -165,50 +35,85 @@ const getCurrentTimeAsString = () => {
     return `${hours}:${minutes}:${seconds}`;
 };
 
-const TextEditor: React.FC<TextEditorProps> = ({ width, height, attemptConnection, inletRef }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ width, height, attemptConnection, inletRef, deleteEditor, updateTypes }) => {
     const [editableText, setEditableText] = useState<string>('Edit Me');
     const [logs, setLogs] = useState<string[]>([`[${getCurrentTimeAsString()}] Text Editor Initialized`]);
+    const [tests, setTests] = useState<Tests>({ testCases: [], inputFieldNames: [] });
+    const [testResults, setTestResults] = useState<(string | null)[]>([]);
     const [operatorType, setOperatorType] = useState<number>(1);
-    const [logsVisible, setLogsVisible] = useState<boolean>(false);
-    const [inputType, setInputType] = useState<string | null>(null);
-    const [outputType, setOutputType] = useState<string | null>(null);
+    // 0 = no panel, 1 = log panel, 2 = test panel, 3 = code panel
+    const [bottomPanel, setBottomPanel] = useState<number>(0);
+    const [types, setTypes] = useState<(FunctionTypes | null)>(null); // [inputTypes, outputType
+    const [generatedCode, setGeneratedCode] = useState<(string | null)>(null);
 
     const BUTTON_SIZE = 25;
     const INLET_OUTLET_OVERLAP = 5;
 
     function log(str: string) {
-        setLogs([...logs, `[${getCurrentTimeAsString()}] ${str}`]);
+        setLogs((logs) => [...logs, `[${getCurrentTimeAsString()}] ${str}`]);
     }
 
     const handleRunButtonClick = () => {
         log('Building function...');
-        setLogsVisible(true);
+        setBottomPanel(1);
         getTypes(editableText).then((types) => {
-            log('Got types!');
-            log(`Input type(s): ${types![0]}`);
-            log(`Output types: ${types![1]}`);
+            setTypes(types)
+            updateTypes(types);
 
-            setInputType(types![0]);
-            setOutputType(types![1]);
+            log('Got types!');
+            var inputs: string[] = []
+            for (let [paramName, paramType] of types!.inputTypes.entries()) {
+                inputs.push(`${paramName}: ${paramType}`)
+            }
+
+            log(`Input type(s): (${inputs.join(', ')})`)
+            log(`Output types: ${types!.outputType}`);
 
             getFunction(editableText, types!).then((generatedFunction) => {
-                log('Got function!');
-                log(`Function: ${generatedFunction}`);
+                log('Generated function!');
+                setGeneratedCode(generatedFunction);
             });
         });
     };
 
     const handleDropdownButtonClick = () => {
-        setLogsVisible(!logsVisible);
+        setBottomPanel((bottomPanel == 1) ? 0 : 1);
     };
 
     const handleMenuButtonClick = () => {
         // Handle menu button click
+        setTests({
+            testCases: [
+                {
+                    inputs: ["1", "2", "3"],
+                    output: "6"
+                },
+                {
+                    inputs: ["4", "5", "6"],
+                    output: "15"
+                },
+                {
+                    inputs: ["7", "8", "9"],
+                    output: "24"
+                }
+            ],
+            inputFieldNames: ["a", "b", "c"]
+        });
+
+        setTestResults(["6", null, "25"]);
     };
 
     const handleOperatorButtonClick = () => {
         setOperatorType((operatorType + 1) % 3);
     };
+
+    const handleCodeButtonClick = () => {
+        setBottomPanel((bottomPanel == 3) ? 0 : 3);
+    }
+
+    const handleTableButtonClick = () => {
+        setBottomPanel((bottomPanel == 2) ? 0 : 2);
+    }
 
     const [draggingConnection, setDraggingConnection] = useState(false);
     // const [connectionStartPos, setConnectionStartPos] = useState({ x: 0, y: 0 });
@@ -249,28 +154,37 @@ const TextEditor: React.FC<TextEditorProps> = ({ width, height, attemptConnectio
                 onChange={(text) => setEditableText(text)}
             />
             { (operatorType >=1) ? (
-                <>
-                    <WatchfulInlet x={-BUTTON_SIZE + INLET_OUTLET_OVERLAP} y={height/2} size={BUTTON_SIZE} inletRef={inletRef}/>
-                    <TypeDial x={-BUTTON_SIZE + INLET_OUTLET_OVERLAP} y={height/2} radius={BUTTON_SIZE/2} type={null}/>
-                </>
+                <WatchfulInlet x={-BUTTON_SIZE + INLET_OUTLET_OVERLAP} y={height/2} size={BUTTON_SIZE} inletRef={inletRef} types={types}/>
             ) : null}
             { (operatorType <= 1) ? (
-                <>
-                    <DraggableOutlet x={width - INLET_OUTLET_OVERLAP} y={height/2} size={BUTTON_SIZE} attemptConnection={attemptConnection} type={null}/>
-                </>
+                <DraggableOutlet x={width - INLET_OUTLET_OVERLAP} y={height/2} size={BUTTON_SIZE} attemptConnection={attemptConnection} types={types}/>
             ) : null}
 
-            { logsVisible ? (
+            { (bottomPanel === 1) ? (
                 <Group y={height}>
                     <LogViewer logs={logs} width={width} height={100}/>
                 </Group>
             ) : null}
 
+            { (bottomPanel === 2) ? (
+                <Group y={height}>
+                    <TestViewer tests={tests} results={testResults} width={width} height={100}/>
+                </Group>
+            ) : null}
+
+            { (bottomPanel === 3) ? (
+                <Group y={height}>
+                    <CodeViewer code={generatedCode} width={width} height={100}/>
+                </Group>
+            ) : null}
+
             <CustomPlayButton x={15} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleRunButtonClick}/>
-            <CustomDropdownButton x={60} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleDropdownButtonClick}/>
-            <CustomMenuButton x={110} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleMenuButtonClick}/>
-            <CustomOperatorButton x={160} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleOperatorButtonClick}/>
-            {/*<Connection x1={200} y1={400} x2={600} y2={500}/>*/}
+            <CustomDropdownButton x={65} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleDropdownButtonClick}/>
+            <CustomMenuButton x={115} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleMenuButtonClick}/>
+            <CustomOperatorButton x={165} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleOperatorButtonClick}/>
+            <CustomCodeButton x={215} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleCodeButtonClick}/>
+            <CustomAnimatedTableButton x={265} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleTableButtonClick} status={0}/>
+            <CustomXButton x={width - (15+BUTTON_SIZE)} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={deleteEditor}/>
         </Group>
     );
 };

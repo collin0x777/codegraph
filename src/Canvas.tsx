@@ -1,64 +1,19 @@
 import React, {useState, useRef, useEffect, createRef} from 'react';
-import {Stage, Layer, Group, Circle, Rect, Line} from 'react-konva';
+import {Stage, Layer, Group, Circle, Rect, Line, Text} from 'react-konva';
 import TextEditor from './TextEditor';
 import Konva from "konva";
 import {CustomAnimatedPlusButton, CustomPlusButton} from "./CustomButtons.tsx";
-
-type ScaledDotLayerProps = {
-    width: number;
-    height: number;
-    scale: number;
-}
-
-const ScaledDotLayer: React.FC<ScaledDotLayerProps> = ({ width, height, scale }) => {
-    const DOT_RADIUS = 5 * scale;
-    const DOT_SPACING = 50 * scale;
-
-    // Calculate the number of dots in both dimensions
-    const numDotsX = Math.ceil(width / DOT_SPACING);
-    const numDotsY = Math.ceil(height / DOT_SPACING);
-
-    // Create an array to store the dots
-    const dots = [];
-
-    for (let i = 0; i < numDotsX; i++) {
-        for (let j = 0; j < numDotsY; j++) {
-            // Calculate the position of each dot
-            const x = i * DOT_SPACING;
-            const y = j * DOT_SPACING;
-
-            // Calculate the radius of each dot
-            const radius = (i % 5 === 0 && j % 5 === 0) ? DOT_RADIUS * 2 : DOT_RADIUS;
-
-            // Push the dot to the array
-            dots.push(
-                <Circle
-                    key={`${i}-${j}`}
-                    x={x}
-                    y={y}
-                    radius={radius}
-                    fill="black"
-                />
-            );
-        }
-    }
-
-    return (
-        <Layer>
-            {dots}
-        </Layer>
-    );
-}
+import Connection, {EditorConnection} from "./Connection.tsx";
+import {FunctionTypes} from "./Requests.tsx";
 
 type CanvasProps = {};
 
-type Editor = {
+export type Editor = {
     id: number;
     x: number;
     y: number;
     inletRef: React.MutableRefObject<any>;
-    inputType: string | null;
-    outputType: string | null;
+    types: FunctionTypes | null;
 }
 
 const Canvas: React.FC<CanvasProps> = () => {
@@ -67,22 +22,45 @@ const Canvas: React.FC<CanvasProps> = () => {
     const zoomLayerRef = useRef<any>(null);
 
     const [editors, setEditors] = useState<Editor[]>([
-        { id: 1, x: 50, y: 50, inletRef: useRef<any>(null), inputType: null, outputType: null },
+        { id: 1, x: 50, y: 50, inletRef: useRef<any>(null), types: null },
     ]);
 
     const [connections, setConnections] = useState<{ id1: number; id2: number }[]>([]);
 
     const addNewEditor = () => {
-        const newEditorId = editors.length + 1;
+        const newEditorId = editors.reduce((maxId, editor) => Math.max(editor.id, maxId), -1) + 1;
         const ref = createRef<any>()
 
-        setEditors([...editors, { id: newEditorId, x: 50, y: 50, inletRef: ref, inputType: null, outputType: null }]);
+        setEditors([...editors, { id: newEditorId, x: 50, y: 50, inletRef: ref, types: null }]);
     };
 
     const removeEditor = (editorId: number) => {
         const updatedEditors = editors.filter((editor) => editor.id !== editorId);
+        const updatedConnections = connections.filter((connection) => connection.id1 !== editorId && connection.id2 !== editorId);
+
         setEditors(updatedEditors);
+        setConnections(updatedConnections);
     };
+
+    const updateEditorTypes = (editorId: number, types: FunctionTypes | null) => {
+        setEditors((editors) => {
+            return editors.map((editor) => {
+                if (editor.id === editorId) {
+                    return { ...editor, types: types };
+                } else {
+                    return editor;
+                }
+            })
+        })
+    }
+
+    const removeConnection = (id1: number, id2: number) => {
+        setConnections((connections) => {
+            return connections.filter((connection) =>
+                !(connection.id1 == id1 && connection.id2 == id2)
+            );
+        });
+    }
 
     const minScale = 0.5;
     const maxScale = 3;
@@ -117,18 +95,30 @@ const Canvas: React.FC<CanvasProps> = () => {
         layer.batchDraw();
     };
 
-    const attemptConnection = (id: number, x: number, y: number) => {
-        let connectedEditor = editors.find((editor) => {
-            return editor.id != id && editor.inletRef.current.intersects({ x, y })
+    const attemptConnection = (editor: Editor, x: number, y: number) => {
+        let connectedEditor = editors.find((targetEditor) => {
+            let notCurrentEditor = targetEditor.id != editor.id;
+            // if either has no types, then we allow it, but if both have types, then we check if they are compatible
+
+            let validTypes = !editor.types || !targetEditor.types || (editor.types.outputType !== null && [...targetEditor.types.inputTypes.values()].includes(editor.types.outputType))
+            // if (validTypes) {
+            //     console.log("Valid types");
+            //     console.log(`Input types ${[...targetEditor.types!.inputTypes.values()]}`)
+            //     console.log(`Output type ${editor.types!.outputType}`)
+            // }
+
+            return notCurrentEditor &&
+                validTypes &&
+                targetEditor.inletRef.current.intersects({ x, y })
         })
 
         if (connectedEditor) {
-            console.log("Found connection between ", id, " and ", connectedEditor.id);
-            let connection = { id1: id, id2: connectedEditor.id };
+            console.log("Found connection between ", editor.id, " and ", connectedEditor.id);
+            let connection = { id1: editor.id, id2: connectedEditor.id };
             if (connections.some((conn) => conn.id1 == connection.id1 && conn.id2 == connection.id2)) {
                 console.log("Connection already exists")
             } else {
-                setConnections([...connections, {id1: id, id2: connectedEditor.id}]);
+                setConnections([...connections, {id1: editor.id, id2: connectedEditor.id}]);
             }
         } else {
             console.log("No connection found")
@@ -139,10 +129,28 @@ const Canvas: React.FC<CanvasProps> = () => {
         <Stage width={window.innerWidth} height={window.innerHeight} onWheel={handleWheel} ref={stageRef}>
             {/*<ScaledDotLayer width={window.innerWidth} height={window.innerHeight} scale={scale} />*/}
             <Layer ref={zoomLayerRef} scale={{ x: scale, y: scale }}>
+                {connections.map((connection) => (
+                    <Group
+                        key={`${connection.id1}-${connection.id2}`}
+                    >
+                        <EditorConnection
+                            editor1={editors.find((editor) => editor.id == connection.id1)!}
+                            editor2={editors.find((editor) => editor.id == connection.id2)!}
+                            deleteConnection={() => { removeConnection(connection.id1, connection.id2) }}
+                        />
+                        {/*<Connection*/}
+                        {/*    x1={editors.find((editor) => editor.id == connection.id1)!.x + 400}*/}
+                        {/*    y1={editors.find((editor) => editor.id == connection.id1)!.y + 100}*/}
+                        {/*    x2={editors.find((editor) => editor.id == connection.id2)!.x}*/}
+                        {/*    y2={editors.find((editor) => editor.id == connection.id2)!.y + 100}*/}
+                        {/*    deleteConnection={() => { removeConnection(connection.id1, connection.id2) }}*/}
+                        {/*/>*/}
+                    </Group>
+                ))}
                 {
                     editors.map((editor) => (
                     <Group
-                        key={editor.id}
+                        key={`editor-${editor.id}`}
                         x={editor.x}
                         y={editor.y}
                         draggable
@@ -153,27 +161,21 @@ const Canvas: React.FC<CanvasProps> = () => {
                             setEditors(updatedEditors);
                         }}
                     >
+                        {/*<Text*/}
+                        {/*    x={0}*/}
+                        {/*    y={-20}*/}
+                        {/*    text={`Inputs: ${editor.types && [...editor.types!.inputTypes.values()]}`} />*/}
+                        {/*<Text*/}
+                        {/*    x={200}*/}
+                        {/*    y={-20}*/}
+                        {/*    text={`Output: ${editor.types && editor.types.outputType}`} />*/}
                         <TextEditor
                             height={200}
                             width={400}
-                            attemptConnection={(x, y) => { attemptConnection(editor.id, x, y) }}
+                            attemptConnection={(x, y) => { attemptConnection(editor, x, y) }}
                             inletRef={editor.inletRef}
-                        />
-                    </Group>
-                ))}
-                {connections.map((connection) => (
-                    <Group
-                        key={`${connection.id1}-${connection.id2}`}
-                    >
-                        <Line
-                            points={[
-                                editors.find((editor) => editor.id == connection.id1)!.x + 400,
-                                editors.find((editor) => editor.id == connection.id1)!.y + 100,
-                                editors.find((editor) => editor.id == connection.id2)!.x,
-                                editors.find((editor) => editor.id == connection.id2)!.y + 100
-                            ]}
-                            stroke="#86BBBD"
-                            strokeWidth={4}
+                            deleteEditor={() => {removeEditor(editor.id) }}
+                            updateTypes={(types: FunctionTypes | null) => { updateEditorTypes(editor.id, types) }}
                         />
                     </Group>
                 ))}
