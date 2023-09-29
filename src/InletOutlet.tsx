@@ -2,7 +2,7 @@ import React, {useState} from "react";
 import {Arc, Group, Line} from "react-konva";
 import {FunctionTypes} from "./Requests.tsx";
 import Konva from "konva";
-import TypeDots from "./TypeDots.tsx";
+import {TypeDots, TypeDotsArc} from "./TypeDots.tsx";
 import Connection from "./Connection.tsx";
 
 type InletOutletProps = {
@@ -80,7 +80,7 @@ export const DraggableOutlet: React.FC<DraggableOutletProps> = ({ x, y, size, at
                 onDragMove={handleOutletDragMove}
                 onDragEnd={handleOutletDragEnd}
             >
-                <TypeDots x={0} y={0} radius={size/2} types={types ? [types!.outputType!] : null}/>
+                <TypeDotsArc x={0} y={0} radius={size/2} params={types ? [{name: "output", type: types!.outputType!}] : null}/>
             </Group>
         </Group>
     )
@@ -95,15 +95,8 @@ type WatchfulInletProps = {
 }
 
 export const WatchfulInlet: React.FC<WatchfulInletProps> = ({ x, y, size, inletRef, types }) => {
-    let inputTypes: string[] = []
-    if (types != null) {
-        for (let [paramName, paramType] of types!.inputTypes.entries()) {
-            inputTypes.push(paramType)
-        }
-    }
-
     return (
-        <Group x={x} y={y} >
+        <Group x={x} y={y}>
             <Arc
                 x={0}
                 y={0}
@@ -114,7 +107,11 @@ export const WatchfulInlet: React.FC<WatchfulInletProps> = ({ x, y, size, inletR
                 rotation={-90}
                 ref={inletRef}
             />
-            <TypeDots x={0} y={0} radius={size/2} types={inputTypes}/>
+            {
+                types ? (
+                    <TypeDots x={0} y={0} radius={size/2} params={types.inputTypes}/>
+                ) : null
+            }
         </Group>
     )
 }

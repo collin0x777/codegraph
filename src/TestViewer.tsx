@@ -3,10 +3,12 @@ import {Arc, Group, Line, Rect, Text} from "react-konva";
 import {Html} from "react-konva-utils";
 import Konva from "konva";
 import Animation = Konva.Animation;
+import {Spinner} from "./CustomIcons.tsx";
 
 export type TestCase = {
     inputs: string[];
     output: string;
+    result: string | null;
 }
 
 export type Tests = {
@@ -15,22 +17,12 @@ export type Tests = {
 }
 
 type TestViewerProps = {
-    tests: Tests;
-    results: (string | null)[];
+    tests: Tests | null;
     width: number;
     height: number;
 }
 
-export const Spinner: React.FC<{x: number, y: number, size: number, degrees: number}> = ({x, y, size, degrees}) => {
-    let outerRadius = size/2;
-    let innerRadius = 2*outerRadius/3;
-
-    return (
-        <Arc x={x + outerRadius} y={y + outerRadius} angle={90} innerRadius={innerRadius} outerRadius={outerRadius} rotation={degrees} fill={"gray"}/>
-    );
-}
-
-const TestViewer: React.FC<TestViewerProps> = ({tests, results, width, height}) => {
+const TestViewer: React.FC<TestViewerProps> = ({tests, width, height}) => {
     let border = 10;
     let margin = 5;
 
@@ -62,10 +54,10 @@ const TestViewer: React.FC<TestViewerProps> = ({tests, results, width, height}) 
                 width={innerWidth}
                 height={innerHeight}
             >
-                { (tests.testCases.length === 0) ? (
+                { (tests === null || tests.testCases.length === 0) ? (
                     <Text x={0} y={0} text={"No test cases"}/>
                 ): (
-                    <TestTable tests={tests} results={results} width={innerWidth} height={innerHeight}/>
+                    <TestTable tests={tests} width={innerWidth} height={innerHeight}/>
                 )}
             </Group>
         </Group>
@@ -74,12 +66,11 @@ const TestViewer: React.FC<TestViewerProps> = ({tests, results, width, height}) 
 
 type TestTableProps = {
     tests: Tests;
-    results: (string | null)[];
     width: number;
     height: number;
 }
 
-const TestTable: React.FC<TestTableProps> = ({tests, results, width, height}) => {
+const TestTable: React.FC<TestTableProps> = ({tests, width, height}) => {
     let columns = tests.inputFieldNames.length + 2;
     let rows = tests.testCases.length + 1;
 
@@ -92,7 +83,7 @@ const TestTable: React.FC<TestTableProps> = ({tests, results, width, height}) =>
     const [spinnerPosition, setSpinnerPosition] = useState<number>(0);
 
     useEffect(() => {
-        if (results.includes(null)) {
+        if (tests.testCases.some((testCase) => testCase.result === null)) {
             let anim = new Animation((frame) => {
                 setSpinnerPosition( (prev) => prev + 5 % 360);
             });
@@ -103,7 +94,7 @@ const TestTable: React.FC<TestTableProps> = ({tests, results, width, height}) =>
         } else {
             return;
         }
-    }, [...results, results.length]);
+    }, [...tests.testCases, tests.testCases.length]);
 
     return (
         <>
@@ -111,7 +102,7 @@ const TestTable: React.FC<TestTableProps> = ({tests, results, width, height}) =>
                 Array.from({length: columns - 1}, (_, i) => i + 1).map((i) => {
                     return (
                         <Line
-                            // key={i}
+                            key={`column-${i}`}
                             points={[i * columnWidth, 0, i * columnWidth, height]}
                             stroke="black"
                             strokeWidth={(i >= columns - 2) ? strokeWidth * 2 : strokeWidth}
@@ -123,7 +114,7 @@ const TestTable: React.FC<TestTableProps> = ({tests, results, width, height}) =>
                 Array.from({length: rows - 1}, (_, i) => i + 1).map((i) => {
                     return (
                         <Line
-                            // key={i}
+                            key={`row-${i}`}
                             points={[0, i * rowHeight, width, i * rowHeight]}
                             stroke="black"
                             strokeWidth={(i === 1) ? strokeWidth * 2 : strokeWidth}
@@ -134,27 +125,27 @@ const TestTable: React.FC<TestTableProps> = ({tests, results, width, height}) =>
             { // input field names
                 [...tests.inputFieldNames, "expected", "output"].map((name, index) => {
                     return (
-                        <Text x={columnWidth * (index) + cellMargin} y={cellMargin} text={name}/>
+                        <Text key={`field-${index}`} x={columnWidth * (index) + cellMargin} y={cellMargin} text={name}/>
                     );
                 })
             }
             { // test cases
                 tests.testCases.map((testCase, caseIndex) => {
                     return (
-                        <Group>
+                        <Group key={caseIndex}>
                             {testCase.inputs.map((input, fieldIndex) => {
                                 return (
-                                    <Text x={columnWidth * (fieldIndex) + cellMargin}
+                                    <Text key={fieldIndex} x={columnWidth * (fieldIndex) + cellMargin}
                                           y={rowHeight * (caseIndex + 1) + cellMargin} text={input}/>
                                 );
                             })}
                             <Text x={columnWidth * (testCase.inputs.length) + cellMargin}
                                   y={rowHeight * (caseIndex + 1) + cellMargin} text={testCase.output}/>
 
-                            { (results[caseIndex]) ? (
-                                <Text fill={(testCase.output === results[caseIndex] ? "green" : "red")}
+                            { (testCase.result) ? (
+                                <Text fill={(testCase.output === testCase.result ? "green" : "red")}
                                       x={columnWidth * (testCase.inputs.length + 1) + cellMargin}
-                                      y={rowHeight * (caseIndex + 1) + cellMargin} text={results[caseIndex]!}/>
+                                      y={rowHeight * (caseIndex + 1) + cellMargin} text={testCase.result}/>
                             ): (
                                 <Spinner
                                     x={columnWidth * (testCase.inputs.length + 1) + cellMargin}

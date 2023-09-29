@@ -1,28 +1,54 @@
-import React, { useState, useRef } from 'react';
-import { Group, Text, Arc, Rect, Circle, RegularPolygon, Line } from 'react-konva';
+import React, {useEffect, useState} from 'react';
+import { Group, Rect } from 'react-konva';
 import EditableTextBox from './EditableTextBox';
 import {
-    CustomAnimatedTableButton,
+    CustomAnimatedBuildButton,
+    CustomAnimatedTableButton, CustomBuildButton,
     CustomCodeButton,
     CustomDropdownButton,
     CustomMenuButton,
     CustomOperatorButton,
-    CustomPlayButton, CustomTableButton, CustomXButton
+    CustomXButton
 } from "./CustomButtons.tsx";
 import {DraggableOutlet, WatchfulInlet} from "./InletOutlet.tsx";
 import LogViewer from "./LogViewer.tsx";
-import Konva from "konva";
-import {FunctionTypes, getFunction, getTypes} from "./Requests.tsx";
+import {FunctionTypes, getFunction, getTests, getTypes} from "./Requests.tsx";
 import TestViewer, {Tests} from "./TestViewer.tsx";
 import CodeViewer from "./CodeViewer.tsx";
+
+export type EditorState = {
+    id: number;
+    x: number;
+    y: number;
+    inletRef: React.MutableRefObject<any>;
+    prompt: string;
+    types: FunctionTypes | null;
+    code: string | null;
+    tests: Tests | null;
+    logs: string[];
+}
+
+export function defaultEditorState(id: number, x: number, y: number): EditorState {
+    return {
+        id: id,
+        x: x,
+        y: y,
+        inletRef: React.createRef<any>(),
+        prompt: "",
+        types: null,
+        code: null,
+        tests: null,
+        logs: []
+    }
+}
 
 type TextEditorProps = {
     width: number;
     height: number;
-    attemptConnection: (x: number, y: number) => void;
-    inletRef: React.MutableRefObject<any>;
+    editor: EditorState,
     deleteEditor: () => void;
-    updateTypes: (types: FunctionTypes | null) => void;
+    updateEditor: (transform: (editor: EditorState) => EditorState) => void;
+    attemptConnection: (x: number, y: number) => void;
 };
 
 const getCurrentTimeAsString = () => {
@@ -35,49 +61,82 @@ const getCurrentTimeAsString = () => {
     return `${hours}:${minutes}:${seconds}`;
 };
 
-const TextEditor: React.FC<TextEditorProps> = ({ width, height, attemptConnection, inletRef, deleteEditor, updateTypes }) => {
-    const [editableText, setEditableText] = useState<string>('Edit Me');
-    const [logs, setLogs] = useState<string[]>([`[${getCurrentTimeAsString()}] Text Editor Initialized`]);
-    const [tests, setTests] = useState<Tests>({ testCases: [], inputFieldNames: [] });
-    const [testResults, setTestResults] = useState<(string | null)[]>([]);
+const TextEditor: React.FC<TextEditorProps> = ({ width, height, editor, deleteEditor, updateEditor, attemptConnection }) => {
     const [operatorType, setOperatorType] = useState<number>(1);
     // 0 = no panel, 1 = log panel, 2 = test panel, 3 = code panel
     const [bottomPanel, setBottomPanel] = useState<number>(0);
-    const [types, setTypes] = useState<(FunctionTypes | null)>(null); // [inputTypes, outputType
-    const [generatedCode, setGeneratedCode] = useState<(string | null)>(null);
+    const [buildStatus, setBuildStatus] = useState<number>(0); // 0 = not built, 1 = building, 2 = built successfully, 3 = build failed
+    const [testStatus, setTestStatus] = useState<number>(0); // 0 = not tested, 1 = testing, 2 = tested successfully, 3 = test failed
 
     const BUTTON_SIZE = 25;
     const INLET_OUTLET_OVERLAP = 5;
 
+    const setTypes = (types: FunctionTypes | null) => { updateEditor((oldEditor: EditorState) => {return {...oldEditor, types: types}})}
+    const setCode = (code: string | null) => { updateEditor(oldEditor => {return {...oldEditor, code: code}})}
+    const setTests = (tests: Tests | null) => { updateEditor(oldEditor => {return {...oldEditor, tests: tests}})}
+    const setPrompt = (prompt: string) => { updateEditor(oldEditor => {return {...oldEditor, prompt: prompt}})}
+
     function log(str: string) {
-        setLogs((logs) => [...logs, `[${getCurrentTimeAsString()}] ${str}`]);
+        updateEditor( oldEditor => {
+            return {...oldEditor, logs: [...oldEditor.logs, `[${getCurrentTimeAsString()}] ${str}`] }
+        });
     }
 
-    const handleRunButtonClick = () => {
+    useEffect(() => {
+        let tests = editor.tests;
+        if (tests) {
+            if (tests.testCases.find(testCase => testCase.result !== null && testCase.result !== testCase.output)) {
+                setTestStatus(3);
+            } else if (tests.testCases.find(testCase => testCase.result === null)) {
+                setTestStatus(1);
+            } else {
+                setTestStatus(2);
+            }
+        }
+    }, [editor.tests?.testCases, editor.tests?.testCases.length])
+
+    const buildFunction = async () => {
         log('Building function...');
+        setBuildStatus(1);
         setBottomPanel(1);
-        getTypes(editableText).then((types) => {
+        try {
+            const types = (await getTypes(editor.prompt))!;
             setTypes(types)
-            updateTypes(types);
 
             log('Got types!');
-            var inputs: string[] = []
-            for (let [paramName, paramType] of types!.inputTypes.entries()) {
-                inputs.push(`${paramName}: ${paramType}`)
-            }
+            const inputTypes: string[] = types.inputTypes.map((input) => input.type);
 
-            log(`Input type(s): (${inputs.join(', ')})`)
-            log(`Output types: ${types!.outputType}`);
+            log(`Input type(s): (${inputTypes.join(', ')})`);
+            log(`Output types: ${types.outputType}`);
 
-            getFunction(editableText, types!).then((generatedFunction) => {
-                log('Generated function!');
-                setGeneratedCode(generatedFunction);
-            });
-        });
-    };
+            const generatedFunction = (await getFunction(editor.prompt, types))!;
+            log('Generated function!');
+            setCode(generatedFunction);
+            setBuildStatus(2);
+        } catch (error) {
+            log(`Error occurred when building: ${error}`);
+            setBuildStatus(3);
+        }
+    }
+
+    const generateTests = async () => {
+        log('Generating test cases...');
+        try {
+            const tests = (await getTests(editor.prompt, editor.types!, editor.code!))!;
+            setTests(tests);
+            log(`Generated ${tests.testCases.length} tests!`);
+        } catch (error) {
+            log(`Error occurred when generating tests: ${error}`);
+        }
+    }
+
+    const handleBuildButtonClick = async () => {
+        await buildFunction();
+        await generateTests()
+    }
 
     const handleDropdownButtonClick = () => {
-        setBottomPanel((bottomPanel == 1) ? 0 : 1);
+        setBottomPanel((bottomPanel === 1) ? 0 : 1);
     };
 
     const handleMenuButtonClick = () => {
@@ -86,21 +145,22 @@ const TextEditor: React.FC<TextEditorProps> = ({ width, height, attemptConnectio
             testCases: [
                 {
                     inputs: ["1", "2", "3"],
-                    output: "6"
+                    output: "6",
+                    result: "6"
                 },
                 {
                     inputs: ["4", "5", "6"],
-                    output: "15"
+                    output: "15",
+                    result: null,
                 },
                 {
                     inputs: ["7", "8", "9"],
-                    output: "24"
+                    output: "24",
+                    result: "25",
                 }
             ],
             inputFieldNames: ["a", "b", "c"]
         });
-
-        setTestResults(["6", null, "25"]);
     };
 
     const handleOperatorButtonClick = () => {
@@ -108,31 +168,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ width, height, attemptConnectio
     };
 
     const handleCodeButtonClick = () => {
-        setBottomPanel((bottomPanel == 3) ? 0 : 3);
+        setBottomPanel((bottomPanel === 3) ? 0 : 3);
     }
 
     const handleTableButtonClick = () => {
-        setBottomPanel((bottomPanel == 2) ? 0 : 2);
+        setBottomPanel((bottomPanel === 2) ? 0 : 2);
     }
-
-    const [draggingConnection, setDraggingConnection] = useState(false);
-    // const [connectionStartPos, setConnectionStartPos] = useState({ x: 0, y: 0 });
-    const [connectionEndPos, setConnectionEndPos] = useState({ x: 0, y: 0 });
-
-    const handleInletDragStart = (e: Konva.KonvaEventObject<DragEvent>) => {
-        setDraggingConnection(true);
-        const inletPos = e.target.getAbsolutePosition();
-        // setConnectionStartPos({ x: inletPos.x, y: inletPos.y });
-    };
-
-    const handleInletDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
-        if (draggingConnection) {
-            const inletPos = e.target.getAbsolutePosition();
-            setConnectionEndPos({ x: inletPos.x, y: inletPos.y });
-            // Handle the connection logic here, e.g., store the connection information.
-            setDraggingConnection(false);
-        }
-    };
 
     return (
         <Group width={width} height={height}>
@@ -146,44 +187,43 @@ const TextEditor: React.FC<TextEditorProps> = ({ width, height, attemptConnectio
                 strokeWidth={10}
             />
             <EditableTextBox
-                text={editableText}
+                text={editor.prompt}
                 x={20}
                 y={20}
                 width={width - 40}
                 height={height - 80}
-                onChange={(text) => setEditableText(text)}
+                onChange={(text) => setPrompt(text)}
             />
             { (operatorType >=1) ? (
-                <WatchfulInlet x={-BUTTON_SIZE + INLET_OUTLET_OVERLAP} y={height/2} size={BUTTON_SIZE} inletRef={inletRef} types={types}/>
+                <WatchfulInlet x={-BUTTON_SIZE + INLET_OUTLET_OVERLAP} y={height/2} size={BUTTON_SIZE} inletRef={editor.inletRef} types={editor.types}/>
             ) : null}
             { (operatorType <= 1) ? (
-                <DraggableOutlet x={width - INLET_OUTLET_OVERLAP} y={height/2} size={BUTTON_SIZE} attemptConnection={attemptConnection} types={types}/>
+                <DraggableOutlet x={width - INLET_OUTLET_OVERLAP} y={height/2} size={BUTTON_SIZE} attemptConnection={attemptConnection} types={editor.types}/>
             ) : null}
 
             { (bottomPanel === 1) ? (
                 <Group y={height}>
-                    <LogViewer logs={logs} width={width} height={100}/>
+                    <LogViewer logs={editor.logs} width={width} height={100}/>
                 </Group>
             ) : null}
 
             { (bottomPanel === 2) ? (
                 <Group y={height}>
-                    <TestViewer tests={tests} results={testResults} width={width} height={100}/>
+                    <TestViewer tests={editor.tests} width={width} height={100}/>
                 </Group>
             ) : null}
 
             { (bottomPanel === 3) ? (
                 <Group y={height}>
-                    <CodeViewer code={generatedCode} width={width} height={100}/>
+                    <CodeViewer code={editor.code} width={width} height={100}/>
                 </Group>
             ) : null}
 
-            <CustomPlayButton x={15} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleRunButtonClick}/>
+            <CustomAnimatedBuildButton x={15} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleBuildButtonClick} status={buildStatus}/>
             <CustomDropdownButton x={65} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleDropdownButtonClick}/>
             <CustomMenuButton x={115} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleMenuButtonClick}/>
-            <CustomOperatorButton x={165} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleOperatorButtonClick}/>
-            <CustomCodeButton x={215} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleCodeButtonClick}/>
-            <CustomAnimatedTableButton x={265} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleTableButtonClick} status={0}/>
+            <CustomCodeButton x={165} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleCodeButtonClick}/>
+            <CustomAnimatedTableButton x={215} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={handleTableButtonClick} status={testStatus}/>
             <CustomXButton x={width - (15+BUTTON_SIZE)} y={height - (15+BUTTON_SIZE)} size={BUTTON_SIZE} onClick={deleteEditor}/>
         </Group>
     );

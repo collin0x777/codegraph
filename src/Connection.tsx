@@ -1,7 +1,7 @@
 import React, {useState} from "react";
 import {Arc, Circle, Group, Line} from "react-konva";
 import {CustomXButton} from "./CustomButtons.tsx";
-import {Editor} from "./Canvas.tsx";
+import {EditorState} from "./TextEditor.tsx";
 
 type ConnectionProps = {
     x1: number;
@@ -112,8 +112,8 @@ const Connection: React.FC<ConnectionProps> = ({ x1, y1, x2, y2, deleteConnectio
 }
 
 type EditorConnectionProps = {
-    editor1: Editor;
-    editor2: Editor;
+    editor1: EditorState;
+    editor2: EditorState;
     deleteConnection: () => void;
 }
 
@@ -121,23 +121,23 @@ export const EditorConnection: React.FC<EditorConnectionProps> = ({ editor1, edi
     let outputType = editor1.types?.outputType;
     let inputTypes = editor2.types?.inputTypes;
 
-    var offsetX = 0;
-    var offsetY = 0;
+    let offsetY = 0;
 
     if (outputType && inputTypes) {
-        let compatibleTypeIndex = [...inputTypes.values()].findIndex((inputType) => inputType === outputType);
+        let compatibleTypeIndex = inputTypes.findIndex((input) => input.type === outputType);
 
         let radius = 25/2;
+        let numDots = inputTypes.length;
+        let dotSpacing = 3 * radius / numDots;
 
-        offsetX = - radius * Math.sin((compatibleTypeIndex * (180 / (inputTypes.size - 1))) * (Math.PI / 180)) - 20;
-        offsetY = radius * Math.cos((compatibleTypeIndex * (180 / (inputTypes.size - 1))) * (Math.PI / 180));
+        offsetY = dotSpacing * compatibleTypeIndex - dotSpacing * (numDots - 1) / 2;
     }
 
     return (
         <Connection
         x1={editor1.x + 400}
         y1={editor1.y + 100}
-        x2={editor2.x + offsetX}
+        x2={editor2.x}
         y2={editor2.y + 100 + offsetY}
         deleteConnection={deleteConnection}
         />

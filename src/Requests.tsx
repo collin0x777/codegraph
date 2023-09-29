@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import {Tests} from "./TestViewer.tsx";
 
 const OPENAI_API_KEY = process.env.REACT_APP_OPENAI_API_KEY;
 const MODEL_ID = "gpt-3.5-turbo";
@@ -28,11 +29,11 @@ async function completionRequest(instructions: string, prompt: string) {
 }
 
 export type FunctionTypes = {
-    inputTypes: Map<string, string>;
+    inputTypes: { name: string, type: string }[];
     outputType: (string | null);
 }
 
-async function getTypes(prompt: string, language: string = DEFAULT_LANGUAGE): Promise<(FunctionTypes | null)> {
+async function getTypes(prompt: string, language: string = DEFAULT_LANGUAGE): Promise<FunctionTypes | null> {
     const instructions: string = `
     You will be given a textual description of a function, reply with the corresponding named input and output types in 
     ${language}, exactly as they would appear in code, separated by line breaks. You do not need to name the output. If 
@@ -50,18 +51,18 @@ async function getTypes(prompt: string, language: string = DEFAULT_LANGUAGE): Pr
         let inputLines = lines.slice(0, lines.length - 1);
         let outputLine = lines[lines.length - 1];
 
-        let inputTypes = new Map<string, string>();
+        let inputTypes: { name: string, type: string }[] = [];
 
         for (let line of inputLines) {
             if (line !== "none") {
                 let [name, ...type] = line.split(": ");
-                inputTypes.set(name, type.join(": "));
+                inputTypes.push({name: name, type: type.join(": ")});
             }
         }
 
         let outputType = outputLine === "none" ? null : outputLine;
 
-        return { inputTypes: inputTypes, outputType: outputType };
+        return {inputTypes: inputTypes, outputType: outputType};
     } else {
         return null;
     }
@@ -69,13 +70,16 @@ async function getTypes(prompt: string, language: string = DEFAULT_LANGUAGE): Pr
 
 async function getFunction(prompt: string, types: FunctionTypes, language: string = DEFAULT_LANGUAGE): Promise<(string | null)> {
     const instructions: string = `
-    You will be given a textual description of a function, reply with its implementation in ${language}. Do not say 
-    anything else.
+    You will be given a textual description of a function, reply with its implementation in ${language}. Only reply with
+    the function, do not add any other text.
     `.trim();
 
-    // let stringTypes = types.map((type) => {if (type === null) return "none"; else return type});
-
-    let inputTypePrompt = types.inputTypes.size === 0 ? ("It takes no inputs.") : ("As inputs, it takes: " + Array.from(types.inputTypes.keys()).map((key) => {return key + ": " + types.inputTypes.get(key)}).join("\n") + "\n\n");
+    let inputTypePrompt =
+        types.inputTypes.length === 0 ?
+            ("It takes no inputs.") :
+            ("As inputs, it takes: " + types.inputTypes.map(({name, type}) => {
+                return name + ": " + type
+            }).join("\n") + "\n\n");
     let outputTypePrompt = types.outputType === null ? ("It returns no outputs.") : ("It returns " + types.outputType + " as an output.");
 
     const typedPrompt: string = `
@@ -88,7 +92,7 @@ async function getFunction(prompt: string, types: FunctionTypes, language: strin
     return await completionRequest(instructions, prompt);
 }
 
-async function getTests(prompt: string, language: string = DEFAULT_LANGUAGE) {
+async function getTests(prompt: string, types: FunctionTypes, func: String, language: string = DEFAULT_LANGUAGE): Promise<Tests | null> {
     const instructions: string = `
     You will be given a textual description of a function, reply with a list of test cases in ${language} that test the 
     function. Each test case should be a function that takes in no arguments and returns a boolean. If the test passes, 
@@ -96,7 +100,26 @@ async function getTests(prompt: string, language: string = DEFAULT_LANGUAGE) {
     "getNameLength" takes in a string and returns an integer, reply with "def testGetNameLength():\n\treturn getNameLength("hello") == 5".
     `.trim();
 
-    return await completionRequest(instructions, prompt);
+    const fieldNames = Array.from(types.inputTypes.keys());
+
+    let result = await completionRequest(instructions, prompt);
+
+    // if (result) {
+    //     let lines = result.split("\n");
+    //     let tests = lines.map((line) => {
+    //         return {
+    //             inputs: [],
+    //             output: "",
+    //             result: null,
+    //         }
+    //     });
+    //
+    //     return {testCases: tests, inputFieldNames: fieldNames};
+    // } else {
+    //     return null;
+    // }
+
+    return null;
 }
 
-export { getTypes, getFunction };
+export {getTypes, getFunction, getTests};
