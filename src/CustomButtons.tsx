@@ -2,6 +2,7 @@ import React, {useEffect, useState} from "react";
 import {Arc, Circle, Group, Line, Rect, RegularPolygon} from "react-konva";
 import Konva from "konva";
 import {Spinner, StatusIndicator} from "./CustomIcons.tsx";
+import {isProxy} from "util/types";
 
 type CustomButtonProps = {
     x: number;
@@ -189,6 +190,8 @@ const CustomAnimatedPlayButton: React.FC<CustomButtonProps> = ({x, y, size, onCl
 }
 
 const CustomDropdownButton: React.FC<CustomButtonProps> = ({x, y, size, onClick}) => {
+    let strokeWidth = size/6
+
     return (
         <Group
             x={x}
@@ -204,7 +207,7 @@ const CustomDropdownButton: React.FC<CustomButtonProps> = ({x, y, size, onClick}
             <Line
                 points={[size / 4, 2 * size / 5, size / 2, 13 * size / 20, 3 * size / 4, 2 * size / 5]}
                 stroke="white"
-                strokeWidth={4}
+                strokeWidth={strokeWidth}
             />
         </Group>
     );
@@ -512,6 +515,20 @@ const CustomXButton: React.FC<CustomButtonProps> = ({x, y, size, onClick}) => {
     );
 }
 
+const CustomAnimatedDropdownButton: React.FC<CustomAnimatedButtonProps> = ({x, y, size, onClick, status}) => {
+    return (
+        <Group
+            x={x + size/2}
+            y={y + size/2}
+            rotation={status*180}
+            offsetX={size/2}
+            offsetY={size/2}
+        >
+            <CustomDropdownButton x={0} y={0} size={size} onClick={onClick}/>
+        </Group>
+    )
+}
+
 const CustomAnimatedPlusButton: React.FC<CustomButtonProps> = ({x, y, size, onClick}) => {
     const [isHovered, setIsHovered] = useState(false);
 
@@ -610,6 +627,7 @@ export {
     CustomCodeButton,
     CustomAnimatedPlusButton,
     CustomAnimatedBuildButton,
+    CustomAnimatedDropdownButton,
     CustomDropdownButton,
     CustomMenuButton,
     CustomOperatorButton

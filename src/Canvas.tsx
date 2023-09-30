@@ -1,11 +1,11 @@
-import React, {useState, useRef, createRef} from 'react';
-import {Stage, Text, Layer, Group} from 'react-konva';
+import React, {useRef, useState} from 'react';
+import {Group, Layer, Stage, Text} from 'react-konva';
 import TextEditor, {defaultEditorState, EditorState} from './TextEditor';
 import Konva from "konva";
-import {CustomAnimatedPlayButton, CustomAnimatedPlusButton, CustomPlayButton} from "./CustomButtons.tsx";
+import {CustomAnimatedPlayButton, CustomAnimatedPlusButton} from "./CustomButtons.tsx";
 import {EditorConnection} from "./Connection.tsx";
-import {FunctionTypes} from "./Requests.tsx";
-import {Tests} from "./TestViewer.tsx";
+import {getArcOffset} from "./TypeDots.tsx";
+import ExecutionPane from "./ExecutionPane.tsx";
 
 type Connection = {
     id1: number;
@@ -52,11 +52,9 @@ const Canvas: React.FC<CanvasProps> = () => {
         })
     }
 
-    const removeConnection = (id1: number, id2: number) => {
+    const removeConnection = (connectionToRemove: Connection) => {
         setConnections((connections) => {
-            return connections.filter((connection) =>
-                !(connection.id1 === id1 && connection.id2 === id2)
-            );
+            return connections.filter((connection) => connection !== connectionToRemove);
         });
     }
 
@@ -93,35 +91,93 @@ const Canvas: React.FC<CanvasProps> = () => {
         layer.batchDraw();
     };
 
+    const getDistance = (x1: number, y1: number, x2: number, y2: number): number => {
+        return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+    }
+
+    const withinDistance = (x1: number, y1: number, x2: number, y2: number, distance: number): boolean => {
+        return getDistance(x1, y1, x2, y2) < distance
+    }
+
     const attemptConnection = (editor: EditorState, x: number, y: number) => {
-        let connectedEditor = editors.find((targetEditor) => {
+        let potentialEditors = editors.filter((targetEditor) => {
             let notCurrentEditor = targetEditor.id !== editor.id;
-            // if either has no types, then we allow it, but if both have types, then we check if they are compatible
+            let inRange = withinDistance(x, y, targetEditor.x, targetEditor.y + targetEditor.height / 2, 50)
 
-            let validTypes = !editor.types || !targetEditor.types || (editor.types.outputType !== null && [...targetEditor.types.inputTypes.map((input) => input.type)].includes(editor.types.outputType))
-
-            return notCurrentEditor &&
-                validTypes &&
-                targetEditor.inletRef.current.intersects({x, y})
+            return notCurrentEditor && inRange
         })
 
-        if (connectedEditor) {
-            console.log("Found connection between ", editor.id, " and ", connectedEditor.id);
-            let connection = {id1: editor.id, id2: connectedEditor.id};
-            if (connections.some((conn) => conn.id1 === connection.id1 && conn.id2 === connection.id2)) {
-                console.log("Connection already exists")
+        console.log(`Potential editors: ${potentialEditors.map((editor) => {return editor.id})}`)
+
+        let potentialConnections = potentialEditors.flatMap((targetEditor) => {
+            let inputs = targetEditor.types?.inputTypes
+
+            if (inputs) {
+                let numTypes = inputs.length
+                return inputs
+                    .filter((input, index) => {
+                        return input.type === editor.types?.outputType &&
+                            !connections.includes({id1: editor.id, id2: targetEditor.id, paramId: index})
+                    })
+                    .map((input, index) => {
+                        let offset = getArcOffset(25, index, numTypes)
+
+                        return {
+                            id1: editor.id,
+                            id2: targetEditor.id,
+                            paramId: index,
+                            x: targetEditor.x - (offset.offsetX),
+                            y: targetEditor.y + targetEditor.height / 2 - offset.offsetY
+                        }
+                    })
             } else {
-                setConnections([...connections, {id1: editor.id, id2: connectedEditor.id, paramId: 0}]);
+                return []
             }
-        } else {
-            console.log("No connection found")
+        })
+
+        console.log(`Potential connections: ${potentialConnections.map((connection) => {
+            return `Id: ${connection.id2}, Param: ${connection.paramId}`
+        })}`)
+
+        if (potentialConnections.length > 0) {
+            let closestConnection = potentialConnections.reduce((connection1, connection2) => {
+                return getDistance(x, y, connection1.x, connection1.y) < getDistance(x, y, connection2.x, connection2.y) ?
+                    connection1 : connection2
+            })
+
+            if (withinDistance(x, y, closestConnection.x, closestConnection.y, 15)) {
+                setConnections([...connections, closestConnection]);
+            }
         }
     }
 
-    const executeGraph = () => {
-        console.log("Executing graph")
+    const validateGraph = () => {
+        console.log("Validating graph")
 
-        let nodes = editors.map((editor) => {
+        let missingInputs = editors.flatMap( (editor) => {
+            let expectedInputs = editor.types?.inputTypes.length
+            let receivedInputs = connections.filter((connection) => {return connection.id2 == editor.id}).length
+
+            if (!expectedInputs || expectedInputs === receivedInputs) {
+                return []
+            } else {
+                return [`Editor ${editor.id} is missing ${expectedInputs - receivedInputs} inputs`]
+            }
+        })
+
+        if (missingInputs.length === 0) {
+            return true
+        } else {
+            console.log("Some nodes are missing inputs")
+            missingInputs.forEach(console.log)
+            return false
+        }
+    }
+
+    const buildGraph = () => {
+        console.log("Building graph")
+
+        return editors.map((editor) => {
             let edges = connections.filter((connection) => connection.id1 === editor.id).map((connection) => {
                 return {
                     id: connection.id2,
@@ -135,31 +191,28 @@ const Canvas: React.FC<CanvasProps> = () => {
                 connections: edges
             }
         })
+    }
 
-        console.log(nodes)
+    const executeGraph = () => {
+        if (validateGraph()) {
+            let graph = buildGraph()
+            console.log(graph)
+
+            console.log("Executing graph")
+        } else {
+            console.log("Graph will not be executed as it failed to build")
+        }
     }
 
     return (
         <Stage width={window.innerWidth} height={window.innerHeight} onWheel={handleWheel} ref={stageRef}>
             {/*<ScaledDotLayer width={window.innerWidth} height={window.innerHeight} scale={scale} />*/}
             <Layer ref={zoomLayerRef} scale={{x: scale, y: scale}}>
-                {connections.map((connection) => (
-                    <Group
-                        key={`${connection.id1}-${connection.id2}`}
-                    >
-                        <EditorConnection
-                            editor1={editors.find((editor) => editor.id === connection.id1)!}
-                            editor2={editors.find((editor) => editor.id === connection.id2)!}
-                            deleteConnection={() => {
-                                removeConnection(connection.id1, connection.id2)
-                            }}
-                        />
-                    </Group>
-                ))}
                 {
                     editors.map((editor) => (
                         <Group
                             key={`editor-${editor.id}`}
+                            ref={editor.ref}
                             x={editor.x}
                             y={editor.y}
                             draggable
@@ -167,7 +220,11 @@ const Canvas: React.FC<CanvasProps> = () => {
                                 const updatedEditors = editors.map((ed) =>
                                     ed.id === editor.id ? {...ed, x: e.target.x(), y: e.target.y()} : ed
                                 );
+                                editor.ref.current.moveToTop();
                                 setEditors(updatedEditors);
+                            }}
+                            onClick={(e) => {
+                                editor.ref.current.moveToTop();
                             }}
                         >
                             <Text
@@ -179,8 +236,6 @@ const Canvas: React.FC<CanvasProps> = () => {
                                 y={-20}
                                 text={`Output: ${editor.types && editor.types.outputType}`}/>
                             <TextEditor
-                                height={200}
-                                width={400}
                                 editor={editor}
                                 deleteEditor={() => {
                                     removeEditor(editor.id)
@@ -194,8 +249,30 @@ const Canvas: React.FC<CanvasProps> = () => {
                             />
                         </Group>
                     ))}
+                {connections.map((connection) => (
+                    <Group
+                        key={`${connection.id1}-${connection.id2}-${connection.paramId}`}
+                    >
+                        <EditorConnection
+                            editor1={editors.find((editor) => editor.id === connection.id1)!}
+                            editor2={editors.find((editor) => editor.id === connection.id2)!}
+                            paramIndex={connection.paramId}
+                            deleteConnection={() => {
+                                removeConnection(connection)
+                            }}
+                        />
+                    </Group>
+                ))}
             </Layer>
             <Layer>
+                <ExecutionPane
+                    x={0}
+                    y={window.innerHeight}
+                    width={window.innerWidth}
+                    initialHeight={200}
+                    maxHeight={600}
+                    minHeight={100}
+                />
                 <CustomAnimatedPlusButton x={ADD_BUTTON_OFFSET}
                                           y={window.innerHeight - ADD_BUTTON_SIZE - ADD_BUTTON_OFFSET}
                                           size={ADD_BUTTON_SIZE} onClick={addEditor}/>

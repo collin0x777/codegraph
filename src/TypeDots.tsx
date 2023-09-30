@@ -5,7 +5,7 @@ type TypeDotsProps = {
     x: number;
     y: number;
     radius: number;
-    params: {name: string, type: string}[] | null;
+    params: {name: string, type: string}[];
 }
 
 function hashCode(str: String): number {
@@ -52,11 +52,26 @@ function typeToColors(type: string | null): string[] {
     return [color1, color2, color3, color4];
 }
 
-const TypeDotsArc: React.FC<TypeDotsProps> = ({ x, y, radius, params }) => {
+const getArcOffset = (radius: number, index: number, count: number) => {
+    let minOffsetAngle = 35;
+    let maxTotalAngle = 135;
+    let offsetAngle = Math.min(minOffsetAngle, maxTotalAngle / Math.max(1, count - 1));
+    let totalAngle = offsetAngle * (count - 1);
+
+    let degrees = index * offsetAngle;
+    let degreesOffset = (180 - totalAngle) / 2;
+    let radians = (degrees + degreesOffset) * (Math.PI / 180);
+
+    let offsetX = radius * Math.sin(radians);
+    let offsetY = radius * Math.cos(radians);
+
+    return { offsetX, offsetY };
+}
+
+const TypeDots: React.FC<TypeDotsProps> = ({ x, y, radius, params }) => {
     let colors = params === null ? [] : params.map(param => typeToColors(param.type)[0]);
     let numDots = colors.length;
-    let dotRadius = radius / numDots;
-    let dotSpacing = radius;
+    let dotRadius = radius / 5;
 
     return (
         <Group
@@ -73,6 +88,8 @@ const TypeDotsArc: React.FC<TypeDotsProps> = ({ x, y, radius, params }) => {
                     />
                 ) : (
                     colors.map((color, index) => {
+                        let offsets = getArcOffset(radius, index, numDots);
+
                         return (
                             <Circle
                                 key={index}
@@ -80,8 +97,8 @@ const TypeDotsArc: React.FC<TypeDotsProps> = ({ x, y, radius, params }) => {
                                 y={0}
                                 radius={dotRadius}
                                 fill={color}
-                                rotation={(index * (180 / (numDots - 1))) - 90}
-                                offsetX={dotSpacing}
+                                offsetX={offsets.offsetX}
+                                offsetY={offsets.offsetY}
                             />
                         )
                     })
@@ -150,38 +167,38 @@ const NamedTypeDot: React.FC<{x: number, y: number, radius: number, name: string
     );
 }
 
-const TypeDots: React.FC<TypeDotsProps> = ({ x, y, radius, params }) => {
-    let namedColors = params === null ? [] : params!.map(param => {
-        return {
-            name: param.name,
-            color: typeToColors(param.type)[0]
-        }
-    });
-    let numDots = namedColors.length;
-    let dotRadius = radius / numDots;
-    let dotSpacing = 3 * radius / numDots;
+// const TypeDots: React.FC<TypeDotsProps> = ({ x, y, radius, params }) => {
+//     let namedColors = params === null ? [] : params!.map(param => {
+//         return {
+//             name: param.name,
+//             color: typeToColors(param.type)[0]
+//         }
+//     });
+//     let numDots = namedColors.length;
+//     let dotRadius = radius / numDots;
+//     let dotSpacing = 3 * radius / numDots;
+//
+//     return (
+//         <Group
+//             x={x}
+//             y={y}
+//         >
+//             {
+//                 namedColors.map((namedColor, index) => {
+//                     return (
+//                         <NamedTypeDot
+//                             key={index}
+//                             x={0}
+//                             y={dotSpacing * index - dotSpacing * (numDots - 1) / 2}
+//                             radius={dotRadius}
+//                             name={namedColor.name}
+//                             fill={namedColor.color}
+//                         />
+//                     )
+//                 })
+//             }
+//         </Group>
+//     );
+// }
 
-    return (
-        <Group
-            x={x}
-            y={y}
-        >
-            {
-                namedColors.map((namedColor, index) => {
-                    return (
-                        <NamedTypeDot
-                            key={index}
-                            x={0}
-                            y={dotSpacing * index - dotSpacing * (numDots - 1) / 2}
-                            radius={dotRadius}
-                            name={namedColor.name}
-                            fill={namedColor.color}
-                        />
-                    )
-                })
-            }
-        </Group>
-    );
-}
-
-export { TypeDots, TypeDotsArc };
+export { TypeDots, getArcOffset };

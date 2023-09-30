@@ -2,6 +2,7 @@ import React, {useState} from "react";
 import {Arc, Circle, Group, Line} from "react-konva";
 import {CustomXButton} from "./CustomButtons.tsx";
 import {EditorState} from "./TextEditor.tsx";
+import {getArcOffset} from "./TypeDots.tsx";
 
 type ConnectionProps = {
     x1: number;
@@ -18,10 +19,11 @@ type SCurveProps = {
     y2: number;
 }
 
-const SCurve: React.FC<SCurveProps> = ({ x1, y1, x2, y2 }) => {
+const SCurve: React.FC<SCurveProps> = ({x1, y1, x2, y2}) => {
     const maxRadius = 40
     const radius = Math.min(maxRadius, (Math.abs(y2 - y1) / 2), (Math.abs(x2 - x1) / 2));
-    const strokeColor = "#86BBBD";
+    // const strokeColor = "#86BBBD";
+    const strokeColor = "black";
     const strokeWidth = 3;
 
     (y1 > y2) && ([y1, y2] = [y2, y1]) && ([x1, x2] = [x2, x1]);
@@ -82,7 +84,7 @@ const SCurve: React.FC<SCurveProps> = ({ x1, y1, x2, y2 }) => {
     )
 }
 
-const Connection: React.FC<ConnectionProps> = ({ x1, y1, x2, y2, deleteConnection }) => {
+const Connection: React.FC<ConnectionProps> = ({x1, y1, x2, y2, deleteConnection}) => {
     const [isHovered, setIsHovered] = useState<boolean>(false);
 
     const handleMouseEnter = () => {
@@ -101,8 +103,8 @@ const Connection: React.FC<ConnectionProps> = ({ x1, y1, x2, y2, deleteConnectio
             <SCurve x1={x1} y1={y1} x2={x2} y2={y2}/>
             {isHovered ? (
                 <CustomXButton
-                    x={(x1 + x2)/2 - 10}
-                    y={(y1 + y2)/2 - 10}
+                    x={(x1 + x2) / 2 - 10}
+                    y={(y1 + y2) / 2 - 10}
                     size={20}
                     onClick={() => deleteConnection()}
                 />
@@ -114,32 +116,30 @@ const Connection: React.FC<ConnectionProps> = ({ x1, y1, x2, y2, deleteConnectio
 type EditorConnectionProps = {
     editor1: EditorState;
     editor2: EditorState;
+    paramIndex: number;
     deleteConnection: () => void;
 }
 
-export const EditorConnection: React.FC<EditorConnectionProps> = ({ editor1, editor2, deleteConnection }) => {
+export const EditorConnection: React.FC<EditorConnectionProps> = ({editor1, editor2, paramIndex, deleteConnection}) => {
     let outputType = editor1.types?.outputType;
     let inputTypes = editor2.types?.inputTypes;
 
+    let offsetX = 0;
     let offsetY = 0;
 
-    if (outputType && inputTypes) {
-        let compatibleTypeIndex = inputTypes.findIndex((input) => input.type === outputType);
-
-        let radius = 25/2;
-        let numDots = inputTypes.length;
-        let dotSpacing = 3 * radius / numDots;
-
-        offsetY = dotSpacing * compatibleTypeIndex - dotSpacing * (numDots - 1) / 2;
+    if (inputTypes) {
+        let offsets = getArcOffset(25, paramIndex, inputTypes.length)
+        offsetX = offsets.offsetX;
+        offsetY = offsets.offsetY;
     }
 
     return (
         <Connection
-        x1={editor1.x + 400}
-        y1={editor1.y + 100}
-        x2={editor2.x}
-        y2={editor2.y + 100 + offsetY}
-        deleteConnection={deleteConnection}
+            x1={editor1.x + editor1.width}
+            y1={editor1.y + editor1.height / 2}
+            x2={editor2.x - offsetX}
+            y2={editor2.y + editor2.height / 2 - offsetY}
+            deleteConnection={deleteConnection}
         />
     );
 }

@@ -1,5 +1,5 @@
-import React, {useRef} from "react";
-import {Group, Rect} from "react-konva";
+import React, {useEffect, useRef} from "react";
+import {Group, Layer, Rect} from "react-konva";
 import {Html} from "react-konva-utils";
 
 type LogViewerProps = {
@@ -8,16 +8,19 @@ type LogViewerProps = {
     height: number;
 }
 
-const LogViewer: React.FC<LogViewerProps> = ({ logs, width, height }) => {
+const BorderedLogViewer: React.FC<LogViewerProps> = ({ logs, width, height }) => {
 
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // todo: use this
     const scrollToBottom = () => {
         if (containerRef.current) {
             containerRef.current.scrollTop = containerRef.current.scrollHeight;
         }
     };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [logs.length]);
 
     return (
         <Group
@@ -44,24 +47,25 @@ const LogViewer: React.FC<LogViewerProps> = ({ logs, width, height }) => {
                 width={width - 30}
                 height={height - 20}
             >
-                <Html>
-                    <div
-                        style={{
-                            height: height - 20,
-                            width: width - 30,
-                            overflowY: 'scroll',
-                            fontSize: 12,
-                        }}
-                        ref={containerRef}
-                    >
-                        {logs.map((log, index) => (
-                            <div key={index}>{log}</div>
-                        ))}
-                    </div>
-                </Html>
+                    <Html>
+                        <div
+                            style={{
+                                height: height - 20,
+                                width: width - 30,
+                                overflowY: 'scroll',
+                                fontSize: 12,
+                                fontFamily: 'monospace',
+                            }}
+                            ref={containerRef}
+                        >
+                            {logs.map((log, index) => (
+                                <div key={index}>{log}</div>
+                            ))}
+                        </div>
+                    </Html>
             </Group>
         </Group>
     );
 };
 
-export default LogViewer;
+export default BorderedLogViewer;

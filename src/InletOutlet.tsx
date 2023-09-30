@@ -2,7 +2,7 @@ import React, {useState} from "react";
 import {Arc, Group, Line} from "react-konva";
 import {FunctionTypes} from "./Requests.tsx";
 import Konva from "konva";
-import {TypeDots, TypeDotsArc} from "./TypeDots.tsx";
+import { TypeDots } from "./TypeDots.tsx";
 import Connection from "./Connection.tsx";
 
 type InletOutletProps = {
@@ -30,10 +30,10 @@ type DraggableOutletProps = {
     y: number;
     size: number;
     attemptConnection: (x: number, y: number) => void;
-    types: FunctionTypes | null;
+    outputType: string;
 }
 
-export const DraggableOutlet: React.FC<DraggableOutletProps> = ({ x, y, size, attemptConnection, types }) => {
+export const DraggableOutlet: React.FC<DraggableOutletProps> = ({ x, y, size, attemptConnection, outputType }) => {
 
     const [draggingConnection, setDraggingConnection] = useState(false);
     const [connectionEndPos, setConnectionEndPos] = useState({ x: 0, y: 0 });
@@ -80,7 +80,7 @@ export const DraggableOutlet: React.FC<DraggableOutletProps> = ({ x, y, size, at
                 onDragMove={handleOutletDragMove}
                 onDragEnd={handleOutletDragEnd}
             >
-                <TypeDotsArc x={0} y={0} radius={size/2} params={types ? [{name: "output", type: types!.outputType!}] : null}/>
+                <TypeDots x={0} y={0} radius={size} params={[{name: "output", type: outputType!}]}/>
             </Group>
         </Group>
     )
@@ -91,10 +91,10 @@ type WatchfulInletProps = {
     y: number;
     size: number;
     inletRef:  React.MutableRefObject<Konva.Arc>;
-    types: (FunctionTypes | null);
+    inputTypes: {name: string, type: string}[];
 }
 
-export const WatchfulInlet: React.FC<WatchfulInletProps> = ({ x, y, size, inletRef, types }) => {
+export const WatchfulInlet: React.FC<WatchfulInletProps> = ({ x, y, size, inletRef, inputTypes }) => {
     return (
         <Group x={x} y={y}>
             <Arc
@@ -104,14 +104,10 @@ export const WatchfulInlet: React.FC<WatchfulInletProps> = ({ x, y, size, inletR
                 outerRadius={size} // Adjust the outer radius as needed
                 angle={180} // Set the angle to 180 degrees for a semicircle
                 fill="#86BBBD" // Fill color
-                rotation={-90}
+                rotation={90}
                 ref={inletRef}
             />
-            {
-                types ? (
-                    <TypeDots x={0} y={0} radius={size/2} params={types.inputTypes}/>
-                ) : null
-            }
+            <TypeDots x={0} y={0} radius={size} params={inputTypes}/>
         </Group>
     )
 }
