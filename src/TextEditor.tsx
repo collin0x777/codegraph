@@ -2,12 +2,9 @@ import React, {useEffect, useState} from 'react';
 import {Group, Rect} from 'react-konva';
 import EditableTextBox from './EditableTextBox';
 import {
-    CustomAnimatedBuildButton,
-    CustomAnimatedTableButton, CustomBuildButton,
-    CustomCodeButton,
-    CustomDropdownButton,
+    CustomAnimatedBuildButton, CustomAnimatedDropdownButton,
+    CustomAnimatedTableButton, CustomCodeButton,
     CustomMenuButton,
-    CustomOperatorButton,
     CustomXButton
 } from "./CustomButtons.tsx";
 import {DraggableOutlet, WatchfulInlet} from "./InletOutlet.tsx";
@@ -66,7 +63,6 @@ const getCurrentTimeAsString = () => {
 };
 
 const TextEditor: React.FC<TextEditorProps> = ({editor, deleteEditor, updateEditor, attemptConnection}) => {
-    const [operatorType, setOperatorType] = useState<number>(1);
     const [bottomPanel, setBottomPanel] = useState<number>(0); // 0 = no panel, 1 = log panel, 2 = test panel, 3 = code panel
     const [buildStatus, setBuildStatus] = useState<number>(0); // 0 = not built, 1 = building, 2 = built successfully, 3 = build failed
     const [testStatus, setTestStatus] = useState<number>(0); // 0 = not tested, 1 = testing, 2 = tested successfully, 3 = test failed
@@ -115,7 +111,7 @@ const TextEditor: React.FC<TextEditorProps> = ({editor, deleteEditor, updateEdit
                 setTestStatus(2);
             }
         }
-    }, [editor.tests?.testCases, editor.tests?.testCases.length])
+    }, [editor.tests, editor.tests?.testCases, editor.tests?.testCases.length])
 
     const buildFunction = async () => {
         log('Building function...');
@@ -188,10 +184,6 @@ const TextEditor: React.FC<TextEditorProps> = ({editor, deleteEditor, updateEdit
         });
     };
 
-    const handleOperatorButtonClick = () => {
-        setOperatorType((operatorType + 1) % 3);
-    };
-
     const handleCodeButtonClick = () => {
         setBottomPanel((bottomPanel === 3) ? 0 : 3);
     }
@@ -248,8 +240,8 @@ const TextEditor: React.FC<TextEditorProps> = ({editor, deleteEditor, updateEdit
 
             <CustomAnimatedBuildButton x={BUTTON_MARGIN} y={BUTTON_Y} size={BUTTON_SIZE}
                                        onClick={handleBuildButtonClick} status={buildStatus}/>
-            <CustomDropdownButton x={BUTTON_MARGIN + BUTTON_SPACING} y={BUTTON_Y} size={BUTTON_SIZE}
-                                  onClick={handleDropdownButtonClick}/>
+            <CustomAnimatedDropdownButton x={BUTTON_MARGIN + BUTTON_SPACING} y={BUTTON_Y} size={BUTTON_SIZE}
+                                  onClick={handleDropdownButtonClick} status={(bottomPanel === 1) ? 1 : 0}/>
             <CustomMenuButton x={BUTTON_MARGIN + (2 * BUTTON_SPACING)} y={BUTTON_Y} size={BUTTON_SIZE}
                               onClick={handleMenuButtonClick}/>
             <CustomCodeButton x={BUTTON_MARGIN + (3 * BUTTON_SPACING)} y={BUTTON_Y} size={BUTTON_SIZE}

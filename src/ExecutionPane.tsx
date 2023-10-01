@@ -1,6 +1,6 @@
 import {useState} from "react";
 import {Circle, Group, Rect} from "react-konva";
-import {CustomAnimatedDropdownButton, CustomDropdownButton} from "./CustomButtons.tsx";
+import {CustomAnimatedDropdownButton} from "./CustomButtons.tsx";
 import Konva from "konva";
 
 

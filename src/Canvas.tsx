@@ -156,7 +156,7 @@ const Canvas: React.FC<CanvasProps> = () => {
 
         let missingInputs = editors.flatMap( (editor) => {
             let expectedInputs = editor.types?.inputTypes.length
-            let receivedInputs = connections.filter((connection) => {return connection.id2 == editor.id}).length
+            let receivedInputs = connections.filter((connection) => {return connection.id2 === editor.id}).length
 
             if (!expectedInputs || expectedInputs === receivedInputs) {
                 return []

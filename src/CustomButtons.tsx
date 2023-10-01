@@ -1,8 +1,6 @@
-import React, {useEffect, useState} from "react";
+import React, {useState} from "react";
 import {Arc, Circle, Group, Line, Rect, RegularPolygon} from "react-konva";
-import Konva from "konva";
-import {Spinner, StatusIndicator} from "./CustomIcons.tsx";
-import {isProxy} from "util/types";
+import {StatusIndicator} from "./CustomIcons.tsx";
 
 type CustomButtonProps = {
     x: number;
