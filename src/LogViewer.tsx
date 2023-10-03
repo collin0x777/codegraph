@@ -153,4 +153,4 @@ const BorderedLogViewer: React.FC<LogViewerProps> = ({ logs, width, height }) =>
     );
 };
 
-export default BorderedLogViewer;
+export {BorderedLogViewer, LogViewer};

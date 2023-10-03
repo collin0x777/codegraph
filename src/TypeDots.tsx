@@ -6,6 +6,7 @@ type TypeDotsProps = {
     y: number;
     radius: number;
     params: {name: string, type: string}[];
+    flip: boolean;
 }
 
 function hashCode(str: String): number {
@@ -68,7 +69,7 @@ const getArcOffset = (radius: number, index: number, count: number) => {
     return { offsetX, offsetY };
 }
 
-const TypeDots: React.FC<TypeDotsProps> = ({ x, y, radius, params }) => {
+const TypeDots: React.FC<TypeDotsProps> = ({ x, y, radius, params, flip }) => {
     let colors = params === null ? [] : params.map(param => typeToColors(param.type)[0]);
     let numDots = colors.length;
     let dotRadius = radius / 5;
@@ -79,30 +80,21 @@ const TypeDots: React.FC<TypeDotsProps> = ({ x, y, radius, params }) => {
             y={y}
         >
             {
-                (numDots === 1) ? (
-                    <Circle
-                        x={0}
-                        y={0}
-                        radius={dotRadius}
-                        fill={colors[0]}
-                    />
-                ) : (
-                    colors.map((color, index) => {
-                        let offsets = getArcOffset(radius, index, numDots);
+                colors.map((color, index) => {
+                    let offsets = getArcOffset(radius, index, numDots);
 
-                        return (
-                            <Circle
-                                key={index}
-                                x={0}
-                                y={0}
-                                radius={dotRadius}
-                                fill={color}
-                                offsetX={offsets.offsetX}
-                                offsetY={offsets.offsetY}
-                            />
-                        )
-                    })
-                )
+                    return (
+                        <Circle
+                            key={index}
+                            x={0}
+                            y={0}
+                            radius={dotRadius}
+                            fill={color}
+                            offsetX={(flip ? -1 : 1) * offsets.offsetX}
+                            offsetY={offsets.offsetY}
+                        />
+                    )
+                })
             }
         </Group>
     );

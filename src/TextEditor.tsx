@@ -8,7 +8,7 @@ import {
     CustomXButton
 } from "./CustomButtons.tsx";
 import {DraggableOutlet, WatchfulInlet} from "./InletOutlet.tsx";
-import BorderedLogViewer from "./LogViewer.tsx";
+import {BorderedLogViewer} from "./LogViewer.tsx";
 import {FunctionTypes, getFunction, getTests, getTypes} from "./Requests.tsx";
 import TestViewer, {Tests} from "./TestViewer.tsx";
 import CodeViewer from "./CodeViewer.tsx";

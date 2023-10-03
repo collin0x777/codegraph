@@ -51,7 +51,7 @@ export const DraggableOutlet: React.FC<DraggableOutletProps> = ({ x, y, size, at
 
         if (draggingConnection) {
             const outletPos = e.target.position();
-            setConnectionEndPos({ x: outletPos.x, y: outletPos.y });
+            setConnectionEndPos({ x: outletPos.x + e.target.offsetX(), y: outletPos.y + e.target.offsetY()});
         }
     };
 
@@ -71,7 +71,6 @@ export const DraggableOutlet: React.FC<DraggableOutletProps> = ({ x, y, size, at
         <Group x={x} y={y} >
             <InletOutlet x={0} y={0} size={size}/>
             <Connection x1={0} y1={0} x2={connectionEndPos.x} y2={connectionEndPos.y} deleteConnection={() => {}}/>
-            {/*<Line points={[0, 0, connectionEndPos.x, connectionEndPos.y]} stroke="#86BBBD" strokeWidth={2}/>*/}
             <Group
                 x={connectionEndPos.x}
                 y={connectionEndPos.y}
@@ -80,7 +79,7 @@ export const DraggableOutlet: React.FC<DraggableOutletProps> = ({ x, y, size, at
                 onDragMove={handleOutletDragMove}
                 onDragEnd={handleOutletDragEnd}
             >
-                <TypeDots x={0} y={0} radius={size} params={[{name: "output", type: outputType!}]}/>
+                <TypeDots x={0} y={0} radius={size} params={[{name: "output", type: outputType!}]} flip={true}/>
             </Group>
         </Group>
     )
@@ -107,7 +106,7 @@ export const WatchfulInlet: React.FC<WatchfulInletProps> = ({ x, y, size, inletR
                 rotation={90}
                 ref={inletRef}
             />
-            <TypeDots x={0} y={0} radius={size} params={inputTypes}/>
+            <TypeDots x={0} y={0} radius={size} params={inputTypes} flip={false}/>
         </Group>
     )
 }

@@ -60,8 +60,6 @@ const Canvas: React.FC<CanvasProps> = () => {
 
     const minScale = 0.5;
     const maxScale = 3;
-    const ADD_BUTTON_SIZE = 60;
-    const ADD_BUTTON_OFFSET = 45;
 
     const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
         e.evt.preventDefault(); // Prevent the default scroll behavior
@@ -272,13 +270,8 @@ const Canvas: React.FC<CanvasProps> = () => {
                     initialHeight={200}
                     maxHeight={600}
                     minHeight={100}
+                    addEditor={addEditor}
                 />
-                <CustomAnimatedPlusButton x={ADD_BUTTON_OFFSET}
-                                          y={window.innerHeight - ADD_BUTTON_SIZE - ADD_BUTTON_OFFSET}
-                                          size={ADD_BUTTON_SIZE} onClick={addEditor}/>
-                <CustomAnimatedPlayButton x={ADD_BUTTON_OFFSET + ADD_BUTTON_SIZE + 10}
-                                          y={window.innerHeight - ADD_BUTTON_SIZE - ADD_BUTTON_OFFSET}
-                                          size={ADD_BUTTON_SIZE} onClick={executeGraph}/>
             </Layer>
         </Stage>
     );
